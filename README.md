@@ -2,7 +2,7 @@
 
 **A presence layer for AI on the web.**
 
-Every AI agent today runs in a separate browser — a stranger trying to walk into your accounts. Upside Down runs inside yours.
+Every AI agent today runs in a separate browser. Like a stranger walking into your life. Upside Down runs inside your browser. No passwords. No auth credentials. Just you and your personal AI, doing the work that needs doing.
 
 ---
 
@@ -21,7 +21,7 @@ Upside Down takes option 2.
 
 ## What It Does
 
-Upside Down is a Chrome extension. It injects a floating panel into every tab. The user types a task in plain English. The system acts — across any tab that's open, including background tabs the user isn't looking at.
+Upside Down is a Chrome extension that injects a floating panel into every tab. The user types a task in plain English, the system acts across any tab that's open, including background tabs the user isn't looking at, or it can open new tabs on its own.
 
 **Confirmed working (February 2026):**
 
@@ -99,7 +99,7 @@ This isn't just a safety feature. It's the product. Every other agentic system t
 
 The web was built assuming a human navigates manually. Every layer — auth, ads, UX, revenue models — assumes human eyeballs moving between pages.
 
-AI agents broke that assumption faster than anyone built an answer. The labs are focused on capability. The infrastructure companies are focused on scale. The identity layer — the part that lets an AI *travel with a person* across their authenticated life — doesn't exist.
+AI agents broke that assumption faster than anyone built an answer. The labs are focused on capability. The infrastructure companies are focused on scale. The identity layer — the part that lets an AI travel with a person across their authenticated life — doesn't exist.
 
 **AP2** (Google's Agent Payments Protocol, launched September 2025 with 60+ partners) solved commerce: AI buys things for you safely. It doesn't solve presence: AI travels with you as your identity across the entire web.
 
