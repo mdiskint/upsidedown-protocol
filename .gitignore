@@ -1,0 +1,10 @@
+.DS_Store
+.env
+credentials.json
+*.mp4
+*.mov
+presence-repo/
+extension_dumps/
+node_modules/
+__pycache__/
+*.pyc
