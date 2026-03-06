@@ -363,6 +363,31 @@
     .presence-confidence { font-family: monospace; font-weight: 700; }
     .presence-time { margin-left: auto; }
     .presence-message { line-height: 1.5; margin-bottom: 8px; white-space: pre-wrap; }
+    .presence-expand-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .presence-expand-btn {
+      border-radius: 6px;
+      border: 1px solid #3a3a3a;
+      background: #212121;
+      color: #ddd;
+      font-size: 11px;
+      padding: 5px 8px;
+      cursor: pointer;
+    }
+    .presence-expand-btn:hover { background: #2b2b2b; }
+    .presence-expand-btn:disabled { opacity: 0.6; cursor: default; }
+    .presence-expand-loading { font-size: 11px; color: #8f8f8f; }
+    .presence-expand-body {
+      margin-bottom: 8px;
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      background: rgba(17,17,17,0.9);
+      color: #d9d9d9;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+    .presence-expand-hidden { display: none; }
     .presence-actions { display: flex; gap: 6px; align-items: center; }
     .score-btn { width: 32px; height: 28px; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; background: transparent; color: #ccc; font-weight: 700; font-size: 13px; cursor: pointer; }
     .score-btn:hover { background: rgba(255,255,255,0.1); }
@@ -467,6 +492,23 @@
     }
     .directive-submit:hover { background: #d96632; }
     .directive-hidden { display: none; }
+    .watch-folder-row { display: flex; align-items: center; gap: 8px; }
+    .watch-folder-status {
+      margin-top: 8px;
+      color: #8f8f8f;
+      font-size: 11px;
+      line-height: 1.4;
+      word-break: break-all;
+    }
+    .watch-folder-path {
+      color: #cfcfcf;
+      display: inline-block;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: bottom;
+    }
     .intake-screen {
       background: #161616;
       border: 1px solid #2c2c2c;
@@ -584,6 +626,7 @@
         <input id="intake-file-input" class="intake-file" type="file" accept=".json,application/json" />
         <div class="intake-actions">
           <button id="intake-upload-btn" class="intake-upload-btn">Upload</button>
+          <button id="intake-skip-btn" class="directive-btn">Already set up</button>
           <span id="intake-progress" class="intake-progress"></span>
         </div>
         <div id="intake-result" class="intake-result"></div>
@@ -593,6 +636,13 @@
           <button id="realtime-toggle-btn" title="Toggle real-time listener">🎙️ Realtime</button>
           <span id="realtime-status-dot"></span>
           <span id="realtime-status-text">off</span>
+        </div>
+        <div class="directive-card">
+          <div class="directive-title">File Watcher</div>
+          <div class="watch-folder-row">
+            <button id="watch-folder-btn" class="directive-btn">Watch Folder</button>
+          </div>
+          <div id="watch-folder-status" class="watch-folder-status">No folder selected.</div>
         </div>
         <div id="directive-active" class="directive-card directive-hidden">
           <div class="directive-title">Prime Directive</div>

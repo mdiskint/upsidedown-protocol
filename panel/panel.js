@@ -556,6 +556,7 @@ const directiveClearBtn = document.getElementById('directive-clear-btn');
 const intakeScreenEl = document.getElementById('intake-screen');
 const intakeFileInputEl = document.getElementById('intake-file-input');
 const intakeUploadBtnEl = document.getElementById('intake-upload-btn');
+const intakeSkipBtnEl = document.getElementById('intake-skip-btn');
 const intakeProgressEl = document.getElementById('intake-progress');
 const intakeResultEl = document.getElementById('intake-result');
 const setupScreenEl = document.getElementById('setup-screen');
@@ -722,6 +723,24 @@ async function processIntakeFile(rawJson) {
   return payload;
 }
 
+async function markOnboardingComplete() {
+  const response = await fetch(getSupabaseUrl() + '/rest/v1/hearth_settings?on_conflict=key', {
+    method: 'POST',
+    headers: {
+      ...supabaseAuthHeaders(),
+      'Prefer': 'resolution=merge-duplicates,return=minimal'
+    },
+    body: JSON.stringify({
+      key: 'onboarding_complete',
+      value: 'true'
+    })
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error('Failed to skip onboarding: HTTP ' + response.status + (detail ? ' ' + detail : ''));
+  }
+}
+
 async function handleIntakeUpload() {
   if (!intakeFileInputEl || !intakeUploadBtnEl) return;
   var file = intakeFileInputEl.files && intakeFileInputEl.files[0];
@@ -766,6 +785,26 @@ async function handleIntakeUpload() {
     if (intakeResultEl) intakeResultEl.textContent = 'Import failed: ' + (err?.message || String(err));
   } finally {
     intakeUploadBtnEl.disabled = false;
+  }
+}
+
+async function handleIntakeSkip() {
+  if (!intakeSkipBtnEl) return;
+  intakeSkipBtnEl.disabled = true;
+  if (intakeUploadBtnEl) intakeUploadBtnEl.disabled = true;
+  if (intakeResultEl) intakeResultEl.textContent = '';
+  if (intakeProgressEl) intakeProgressEl.textContent = 'Skipping intake...';
+  try {
+    await markOnboardingComplete();
+    if (intakeProgressEl) intakeProgressEl.textContent = '';
+    setIntakeMode(false);
+    initNormalPopup();
+  } catch (err) {
+    if (intakeProgressEl) intakeProgressEl.textContent = '';
+    if (intakeResultEl) intakeResultEl.textContent = err?.message || String(err);
+  } finally {
+    intakeSkipBtnEl.disabled = false;
+    if (intakeUploadBtnEl) intakeUploadBtnEl.disabled = false;
   }
 }
 
@@ -876,11 +915,86 @@ function renderPresenceNotification(notification) {
     (confidence ? '<span class="presence-confidence" style="color:' + confidenceColor + '">' + Math.round(confidence * 100) + '%</span>' : '') +
     '<span class="presence-time">' + ago + '</span></div>' +
     '<div class="presence-message">' + notification.message.replace(/</g, '&lt;') + '</div>' +
+    '<div class="presence-expand-row">' +
+    '<button class="presence-expand-btn" type="button">Expand</button>' +
+    '<span class="presence-expand-loading"></span>' +
+    '</div>' +
+    '<div class="presence-expand-body presence-expand-hidden"></div>' +
     '<div class="presence-actions">' +
     '<button class="score-btn score-e" data-score="E" title="Excellent">E</button>' +
     '<button class="score-btn score-g" data-score="G" title="Good">G</button>' +
     '<button class="score-btn score-d" data-score="D" title="Didn\'t land">D</button>' +
     '<button class="dismiss-btn" title="Dismiss">✕</button></div>';
+
+  var expandBtn = el.querySelector('.presence-expand-btn');
+  var expandLoading = el.querySelector('.presence-expand-loading');
+  var expandBody = el.querySelector('.presence-expand-body');
+  var expandTextCache = '';
+  var expandOpen = false;
+
+  function setExpandUi() {
+    if (!expandBtn || !expandBody) return;
+    expandBtn.textContent = expandOpen ? 'Collapse' : 'Expand';
+    expandBody.classList.toggle('presence-expand-hidden', !expandOpen);
+  }
+
+  function extractConverseText(payload) {
+    if (!payload) return '';
+    if (typeof payload === 'string') return payload.trim();
+    if (typeof payload.response === 'string') return payload.response.trim();
+    if (typeof payload.message === 'string') return payload.message.trim();
+    if (typeof payload.text === 'string') return payload.text.trim();
+    if (payload.data && typeof payload.data.response === 'string') return payload.data.response.trim();
+    if (Array.isArray(payload.content) && payload.content[0] && typeof payload.content[0].text === 'string') {
+      return payload.content[0].text.trim();
+    }
+    return '';
+  }
+
+  async function expandBreadcrumb() {
+    if (!expandBtn || !expandBody || !expandLoading) return;
+    if (expandOpen) {
+      expandOpen = false;
+      setExpandUi();
+      return;
+    }
+
+    if (expandTextCache) {
+      expandBody.textContent = expandTextCache;
+      expandOpen = true;
+      setExpandUi();
+      return;
+    }
+
+    expandBtn.disabled = true;
+    expandLoading.textContent = 'Loading...';
+    try {
+      const response = await fetch(getSupabaseUrl() + '/functions/v1/hearth-converse', {
+        method: 'POST',
+        headers: supabaseAuthHeaders(),
+        body: JSON.stringify({
+          question: 'Explain this breadcrumb in 2-3 paragraphs — what pattern you saw, why it was worth surfacing, and what connection you made. Be specific. Breadcrumb: ' + notification.message
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error((payload && payload.error) || ('HTTP ' + response.status));
+      }
+      const expanded = extractConverseText(payload);
+      if (!expanded) {
+        throw new Error('No expansion text returned');
+      }
+      expandTextCache = expanded;
+      expandBody.textContent = expandTextCache;
+      expandOpen = true;
+      setExpandUi();
+    } catch (err) {
+      showMessage('Expand failed: ' + (err?.message || String(err)));
+    } finally {
+      expandBtn.disabled = false;
+      expandLoading.textContent = '';
+    }
+  }
 
   function finalizeScore(outcome) {
     el.querySelector('.presence-actions').innerHTML = '<span class="score-result">Scored: ' + outcome + '</span>';
@@ -960,6 +1074,9 @@ function renderPresenceNotification(notification) {
     chrome.runtime.sendMessage({ type: 'MARK_NOTIFICATION_READ', notificationId: notification.id });
     removePresenceNotificationById(notification.id);
   });
+  if (expandBtn) {
+    expandBtn.addEventListener('click', expandBreadcrumb);
+  }
 
   chrome.runtime.sendMessage({ type: 'MARK_NOTIFICATION_READ', notificationId: notification.id });
   container.prepend(el);
@@ -996,6 +1113,9 @@ chrome.runtime.onMessage.addListener(function(msg) {
 const realtimeToggleBtn = document.getElementById('realtime-toggle-btn');
 const realtimeStatusDot = document.getElementById('realtime-status-dot');
 const realtimeStatusText = document.getElementById('realtime-status-text');
+const watchFolderBtn = document.getElementById('watch-folder-btn');
+const watchFolderStatusEl = document.getElementById('watch-folder-status');
+let activeWatchedFolder = '';
 
 function setRealtimeToggleUi(active) {
   if (!realtimeToggleBtn || !realtimeStatusDot || !realtimeStatusText) return;
@@ -1003,6 +1123,69 @@ function setRealtimeToggleUi(active) {
   realtimeStatusDot.classList.toggle('active', active);
   realtimeStatusText.textContent = active ? 'recording' : 'off';
   realtimeStatusText.style.color = active ? '#ef4444' : '#777';
+}
+
+function truncateFolderPath(path) {
+  var value = String(path || '').trim();
+  if (value.length <= 64) return value;
+  return '...' + value.slice(-61);
+}
+
+function setWatchFolderUi(folderPath) {
+  activeWatchedFolder = String(folderPath || '').trim();
+  if (watchFolderBtn) {
+    watchFolderBtn.textContent = activeWatchedFolder ? 'Stop Watching' : 'Watch Folder';
+  }
+  if (!watchFolderStatusEl) return;
+  if (!activeWatchedFolder) {
+    watchFolderStatusEl.textContent = 'No folder selected.';
+    return;
+  }
+  watchFolderStatusEl.innerHTML = 'Watching: <span class="watch-folder-path">' + truncateFolderPath(activeWatchedFolder).replace(/</g, '&lt;') + '</span>';
+}
+
+async function refreshWatchFolderStatus() {
+  if (!watchFolderStatusEl) return;
+  try {
+    var response = await fetch('http://localhost:5556/status');
+    if (!response.ok) {
+      // Backward compatibility with older daemon builds that only expose /health.
+      response = await fetch('http://localhost:5556/health');
+    }
+    if (!response.ok) {
+      throw new Error('HTTP ' + response.status);
+    }
+    var payload = await response.json();
+    setWatchFolderUi(payload?.watched_folder || payload?.watch_folder || payload?.watchFolder || payload?.folder || '');
+  } catch (err) {
+    console.warn('[Presence] Failed to load watch folder status:', err?.message || err);
+    setWatchFolderUi('');
+  }
+}
+
+async function toggleWatchFolder() {
+  if (!watchFolderBtn) return;
+  watchFolderBtn.disabled = true;
+  try {
+    const endpoint = activeWatchedFolder ? 'http://localhost:5556/stop-watching' : 'http://localhost:5556/pick-folder';
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || ('HTTP ' + response.status));
+    }
+    if (payload?.ok === false) {
+      throw new Error(payload?.error || 'Folder picker failed');
+    }
+    await refreshWatchFolderStatus();
+  } catch (err) {
+    showMessage('Watch folder failed: ' + (err?.message || String(err)));
+  } finally {
+    watchFolderBtn.disabled = false;
+  }
 }
 
 async function refreshRealtimeToggle() {
@@ -1042,6 +1225,9 @@ async function toggleRealtimeActive() {
 if (realtimeToggleBtn) {
   realtimeToggleBtn.addEventListener('click', toggleRealtimeActive);
 }
+if (watchFolderBtn) {
+  watchFolderBtn.addEventListener('click', toggleWatchFolder);
+}
 
 if (directiveSubmitBtn) {
   directiveSubmitBtn.addEventListener('click', submitDirective);
@@ -1075,6 +1261,7 @@ function initNormalPopup() {
   setSetupMode(false);
   setIntakeMode(false);
   refreshRealtimeToggle();
+  refreshWatchFolderStatus();
   refreshPrimeDirective();
 
   chrome.storage.session.get('presenceNotifications', function(data) {
@@ -1145,6 +1332,9 @@ async function bootOnboardingGate() {
 
 if (intakeUploadBtnEl) {
   intakeUploadBtnEl.addEventListener('click', handleIntakeUpload);
+}
+if (intakeSkipBtnEl) {
+  intakeSkipBtnEl.addEventListener('click', handleIntakeSkip);
 }
 if (setupContinueBtnEl) {
   setupContinueBtnEl.addEventListener('click', handleSetupContinue);
