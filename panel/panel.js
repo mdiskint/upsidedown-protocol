@@ -1356,4 +1356,5 @@ if (setupAnonKeyInputEl) {
   });
 }
 
+chrome.runtime.sendMessage({ type: 'POPUP_OPENED' }).catch(() => {});
 bootOnboardingGate();

@@ -19,6 +19,23 @@ const PLATFORM_MEMORY_SCRAPE_INTERVAL_MS = 60 * 60 * 1000; // check every hour
 const PLATFORM_MEMORY_SCRAPE_STALE_MS = 24 * 60 * 60 * 1000; // scrape every 24h
 const PLATFORM_MEMORY_SCRAPE_KEY = 'lastPlatformMemoryScrape';
 let platformMemoryScrapeTimer = null;
+let pulseInterval = null;
+let pulseFrame = false;
+
+function startPulse() {
+  if (pulseInterval) return;
+  chrome.action.setBadgeText({ text: '●' });
+  chrome.action.setBadgeBackgroundColor({ color: '#C084FC' });
+  pulseInterval = setInterval(() => {
+    pulseFrame = !pulseFrame;
+    chrome.action.setBadgeBackgroundColor({ color: pulseFrame ? '#C084FC' : '#7C3AED' });
+  }, 800);
+}
+
+function stopPulse() {
+  if (pulseInterval) { clearInterval(pulseInterval); pulseInterval = null; }
+  chrome.action.setBadgeText({ text: '' });
+}
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => {
   console.warn('[UD] sidePanel behavior setup failed:', err?.message || err);
@@ -192,6 +209,9 @@ async function pollPresenceNotifications() {
     );
     if (!response.ok) return;
     const notifications = await response.json();
+    if (Array.isArray(notifications) && notifications.length > 0) {
+      startPulse();
+    }
     const data = await chrome.storage.session.get('presenceNotifications');
     const existing = Array.isArray(data.presenceNotifications) ? data.presenceNotifications : [];
     const existingById = new Map(existing.map((n) => [String(n?.id), n]));
@@ -2840,6 +2860,119 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true; // keep channel open for async response
 });
 
+const TAB_SEQUENCE_MAX_ENTRIES = 20;
+const TAB_SEQUENCE_RETURN_TO_WINDOW = 10;
+const TAB_SEQUENCE_FLUSH_INTERVAL_MS = 5 * 60 * 1000;
+let tabSequence = [];
+const tabSequenceReturnToDomains = new Set();
+
+function tabSequenceDomainFromUrl(rawUrl) {
+  try {
+    return new URL(rawUrl).hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+async function recordTabSequenceEntry(tabId) {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    const url = String(tab?.url || '');
+    if (!url || !(url.startsWith('http://') || url.startsWith('https://'))) return;
+    const domain = tabSequenceDomainFromUrl(url);
+    if (!domain) return;
+
+    const recent = tabSequence.slice(-TAB_SEQUENCE_RETURN_TO_WINDOW);
+    if (recent.some((entry) => entry.domain === domain)) {
+      tabSequenceReturnToDomains.add(domain);
+    }
+
+    const entry = {
+      tabId: tab.id,
+      title: String(tab.title || ''),
+      url,
+      domain,
+      timestamp: new Date().toISOString()
+    };
+    tabSequence.push(entry);
+    if (tabSequence.length > TAB_SEQUENCE_MAX_ENTRIES) {
+      tabSequence = tabSequence.slice(-TAB_SEQUENCE_MAX_ENTRIES);
+    }
+  } catch (err) {
+    console.error('[TAB_SEQUENCE] record failed:', err?.message || err);
+  }
+}
+
+async function flushTabSequence() {
+  try {
+    if (!Array.isArray(tabSequence) || tabSequence.length < 3) return { success: false, skipped: true };
+
+    const cfg = await getSupabaseRuntimeConfig();
+    if (!isSupabaseConfigReady(cfg)) return { success: false, error: 'config_missing' };
+
+    const domains = tabSequence.map((entry) => entry.domain).filter(Boolean);
+    const sequenceValue = domains.join(' \u2192 ').slice(0, 500);
+    const startedAt = Date.parse(tabSequence[0]?.timestamp || '') || Date.now();
+    const endedAt = Date.parse(tabSequence[tabSequence.length - 1]?.timestamp || '') || Date.now();
+    const sessionDurationSeconds = Math.max(0, Math.round((endedAt - startedAt) / 1000));
+    const returnToDomains = Array.from(new Set([
+      ...tabSequenceReturnToDomains,
+      ...Array.from(new Set(domains.filter((d, i) => domains.indexOf(d) !== i)))
+    ]));
+
+    const res = await fetch(`${cfg.url}/rest/v1/activity_signal`, {
+      method: 'POST',
+      headers: supabaseHeaders(cfg, { 'Prefer': 'return=minimal' }),
+      body: JSON.stringify([{
+        user_id: cfg.userId || null,
+        signal_type: 'tab_sequence',
+        signal_value: sequenceValue,
+        metadata: {
+          sequence: tabSequence,
+          return_to_domains: returnToDomains,
+          session_duration_seconds: sessionDurationSeconds,
+          entry_count: tabSequence.length
+        }
+      }]),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.error('[TAB_SEQUENCE] flush write failed:', errText);
+      return { success: false, error: errText || ('HTTP ' + res.status) };
+    }
+
+    tabSequence = [];
+    tabSequenceReturnToDomains.clear();
+    return { success: true };
+  } catch (err) {
+    console.error('[TAB_SEQUENCE] flush error:', err?.message || err);
+    return { success: false, error: err?.message || String(err) };
+  }
+}
+
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  await recordTabSequenceEntry(activeInfo.tabId);
+});
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status !== 'complete') return;
+  if (!tab || !tab.active) return;
+  await recordTabSequenceEntry(tabId);
+});
+
+setInterval(() => {
+  flushTabSequence().catch((err) => {
+    console.error('[TAB_SEQUENCE] periodic flush error:', err?.message || err);
+  });
+}, TAB_SEQUENCE_FLUSH_INTERVAL_MS);
+
+chrome.runtime.onSuspend.addListener(() => {
+  flushTabSequence().catch((err) => {
+    console.error('[TAB_SEQUENCE] suspend flush error:', err?.message || err);
+  });
+});
+
 async function handleMessage(message, sender) {
   const session = await getSession();
 
@@ -2862,6 +2995,67 @@ async function handleMessage(message, sender) {
   if (message.type === 'SCORE_NOTIFICATION') {
     scoreNotification(message.notificationId, message.outcome, message.gradeReason);
     return { success: true };
+  }
+
+  if (message.type === 'POPUP_OPENED') {
+    stopPulse();
+    return { success: true };
+  }
+
+  if (message.type === 'TOPIC_SIGNAL_FROM_TITLE') {
+    try {
+      const cfg = await getSupabaseRuntimeConfig();
+      if (!isSupabaseConfigReady(cfg)) return { success: false, error: 'config_missing' };
+      const res = await fetch(`${cfg.url}/rest/v1/activity_signal`, {
+        method: 'POST',
+        headers: supabaseHeaders(cfg, { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify([{
+          user_id: cfg.userId || null,
+          signal_type: 'topic_signal',
+          signal_value: message.signal_value,
+          metadata: message.metadata || {},
+        }]),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        console.error('[TITLE_OBSERVER] write failed:', err);
+        return { success: false, error: err };
+      }
+      console.log('[TITLE_OBSERVER] wrote topic_signal:', message.signal_value?.slice(0, 80));
+      return { success: true };
+    } catch (err) {
+      console.error('[TITLE_OBSERVER] handler error:', err?.message || err);
+      return { success: false, error: err?.message || String(err) };
+    }
+  }
+
+  if (message.type === 'SCROLL_DEPTH_SIGNAL') {
+    try {
+      const cfg = await getSupabaseRuntimeConfig();
+      if (!isSupabaseConfigReady(cfg)) return { success: false, error: 'config_missing' };
+      const res = await fetch(`${cfg.url}/rest/v1/activity_signal`, {
+        method: 'POST',
+        headers: supabaseHeaders(cfg, { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify([{
+          user_id: cfg.userId || null,
+          signal_type: 'scroll_depth',
+          signal_value: message.signal_value,
+          metadata: message.metadata || {},
+        }]),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        console.error('[SCROLL_DEPTH] write failed:', err);
+        return { success: false, error: err };
+      }
+      const depth = message.metadata?.scroll_depth_pct ?? '?';
+      const secs = message.metadata?.time_on_page_seconds ?? '?';
+      console.log(`[SCROLL_DEPTH] ${depth}% in ${secs}s — ${message.signal_value?.slice(0, 60)}`);
+      return { success: true };
+    } catch (err) {
+      console.error('[SCROLL_DEPTH] handler error:', err?.message || err);
+      return { success: false, error: err?.message || String(err) };
+    }
   }
 
   if (message.type === 'PLATFORM_MEMORIES_SCRAPED') {
