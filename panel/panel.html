@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Upside Down</title>
+  <title>Presence</title>
   <style>
     * {
       box-sizing: border-box;
@@ -12,8 +12,8 @@
     }
 
     body {
-      width: 360px;
-      min-height: 120px;
+      width: 100%;
+      min-height: 100vh;
       background: #0e0e0e;
       color: #f0f0f0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -28,8 +28,9 @@
       background: #222;
       transition: background 0.4s ease;
     }
-    #status-bar.working   { background: #f97316; } /* orange */
-    #status-bar.approval  { background: #22c55e; } /* green */
+    #status-bar.working    { background: #f97316; } /* orange */
+    #status-bar.approval   { background: #22c55e; } /* green */
+    #status-bar.needs-help { background: #3b82f6; } /* blue */
 
     /* ── Main area ── */
     #main {
@@ -37,6 +38,8 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+      flex: 1;
+      min-height: 0;
     }
 
     /* ── Message display ── */
@@ -51,6 +54,24 @@
       white-space: pre-wrap;
     }
     #message-display.visible { display: block; }
+
+    #recovery-row {
+      display: none;
+      gap: 8px;
+    }
+    #recovery-row.visible { display: flex; }
+
+    #recover-btn {
+      background: #f97316;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #recover-btn:hover { background: #ea6a0a; }
 
     /* ── Input row ── */
     #input-row {
@@ -141,6 +162,137 @@
     }
     #decline-btn:hover { background: #2a2a2a; }
 
+    /* ── Ask panel (User Assistance) ── */
+    #ask-panel {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #ask-panel.visible { display: flex; }
+
+    #ask-input-row { display: flex; }
+
+    #ask-answer {
+      flex: 1;
+      background: #1a1a1a;
+      border: 1px solid #3b82f6;
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: #f0f0f0;
+      font-size: 13px;
+      resize: none;
+      outline: none;
+      width: 100%;
+      line-height: 1.4;
+    }
+    #ask-answer:focus { border-color: #60a5fa; }
+    #ask-answer::placeholder { color: #555; }
+
+    #ask-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    #answer-btn {
+      flex: 1;
+      background: #3b82f6;
+      border: none;
+      border-radius: 6px;
+      padding: 8px;
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #answer-btn:hover { background: #2563eb; }
+
+    #cancel-ask-btn {
+      flex: 1;
+      background: #1a1a1a;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 8px;
+      color: #f0f0f0;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #cancel-ask-btn:hover { background: #2a2a2a; }
+
+    /* ── Teach panel ("Show Me") ── */
+    #teach-panel {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #teach-panel.visible { display: flex; }
+
+    #teach-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    #show-me-btn {
+      flex: 1;
+      background: #3b82f6;
+      border: none;
+      border-radius: 6px;
+      padding: 8px;
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #show-me-btn:hover { background: #2563eb; }
+
+    #cancel-teach-btn {
+      flex: 1;
+      background: #1a1a1a;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 8px;
+      color: #f0f0f0;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #cancel-teach-btn:hover { background: #2a2a2a; }
+
+    /* ── Queue mission log ── */
+    #queue-log {
+      display: none;
+      background: #1a1a1a;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #d0d0d0;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    #queue-log.visible { display: block; }
+
+    .queue-task {
+      display: flex;
+      gap: 6px;
+      align-items: flex-start;
+      padding: 3px 0;
+    }
+    .queue-task .emoji { flex-shrink: 0; width: 18px; text-align: center; }
+    .queue-task .mission { flex: 1; }
+    .queue-task .result {
+      color: #888;
+      font-size: 11px;
+      margin-top: 1px;
+    }
+    .queue-task.completed .mission { color: #4ade80; }
+    .queue-task.failed .mission { color: #f87171; }
+    .queue-task.parked .mission { color: #fbbf24; }
+    .queue-task.running .mission { color: #f97316; }
+    .queue-task.pending .mission { color: #555; }
+
     /* ── API key setup ── */
     #api-key-section {
       display: none;
@@ -194,6 +346,223 @@
       padding: 0;
     }
     #settings-toggle:hover { color: #888; }
+
+    #output-feed {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 0 0 6px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .presence-notification { background: rgba(30,30,30,0.95); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; margin-bottom: 8px; font-size: 13px; color: #e0e0e0; transition: opacity 0.3s ease, transform 0.3s ease; }
+    .presence-notification.fade-out { opacity: 0; transform: translateY(-10px); }
+    .presence-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 11px; color: #888; }
+    .presence-type { font-weight: 600; }
+    .presence-confidence { font-family: monospace; font-weight: 700; }
+    .presence-time { margin-left: auto; }
+    .presence-message { line-height: 1.5; margin-bottom: 8px; white-space: pre-wrap; }
+    .presence-actions { display: flex; gap: 6px; align-items: center; }
+    .score-btn { width: 32px; height: 28px; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; background: transparent; color: #ccc; font-weight: 700; font-size: 13px; cursor: pointer; }
+    .score-btn:hover { background: rgba(255,255,255,0.1); }
+    .score-e:hover { border-color: #4ade80; color: #4ade80; }
+    .score-g:hover { border-color: #fbbf24; color: #fbbf24; }
+    .score-d:hover { border-color: #f87171; color: #f87171; }
+    .dismiss-btn { margin-left: auto; background: transparent; border: none; color: #666; cursor: pointer; font-size: 14px; padding: 4px 8px; }
+    .score-result { color: #888; font-size: 12px; font-style: italic; }
+    .presence-reason-wrap { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+    .presence-reason-label { font-size: 11px; color: #bbb; }
+    .presence-reason-input {
+      width: 100%;
+      background: #131313;
+      color: #e0e0e0;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 6px;
+      padding: 7px 8px;
+      font-size: 12px;
+      outline: none;
+    }
+    .presence-reason-input:focus { border-color: #f87171; }
+    .presence-reason-actions { display: flex; gap: 6px; }
+    .presence-reason-submit,
+    .presence-reason-skip {
+      border-radius: 5px;
+      padding: 5px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: transparent;
+      color: #ddd;
+    }
+    .presence-reason-submit { border-color: rgba(248,113,113,0.55); color: #fca5a5; }
+    .presence-reason-submit:hover { background: rgba(248,113,113,0.12); }
+    .presence-reason-skip:hover { background: rgba(255,255,255,0.08); }
+    #realtime-toggle-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    #realtime-toggle-btn { background: #333; color: #cfcfcf; border: 1px solid #555; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 12px; font-weight: 600; }
+    #realtime-toggle-btn.active { background: #14532d; border-color: #4ade80; color: #4ade80; }
+    #realtime-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #666; display: inline-block; }
+    #realtime-status-dot.active { background: #ef4444; animation: realtime-pulse 1.2s ease-in-out infinite; }
+    #realtime-status-text { font-size: 11px; color: #777; }
+    .directive-card {
+      background: #171717;
+      border: 1px solid #303030;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 8px;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+    }
+    .directive-title { font-size: 11px; color: #8f8f8f; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+    .directive-text { color: #f0f0f0; font-size: 13px; line-height: 1.5; }
+    .directive-meta { color: #8f8f8f; font-size: 11px; margin-top: 8px; }
+    .directive-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .directive-btn {
+      border-radius: 6px;
+      border: 1px solid #3a3a3a;
+      background: #212121;
+      color: #ddd;
+      font-size: 12px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .directive-btn:hover { background: #2b2b2b; }
+    .directive-btn.clear { border-color: rgba(248,113,113,0.45); color: #fca5a5; }
+    .directive-input-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      margin-top: 8px;
+      width: 100%;
+      max-width: 100%;
+    }
+    .directive-input {
+      flex: 1;
+      min-width: 0;
+      width: auto;
+      max-width: 100%;
+      background: #111111;
+      color: #ececec;
+      border: 1px solid #3a3a3a;
+      border-radius: 7px;
+      padding: 8px 10px;
+      font-size: 13px;
+      outline: none;
+    }
+    .directive-input:focus { border-color: #4f4f4f; }
+    .directive-input::placeholder { color: #666; }
+    .directive-submit {
+      flex-shrink: 0;
+      border: none;
+      border-radius: 7px;
+      background: #e8713a;
+      color: #fff;
+      font-weight: 700;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .directive-submit:hover { background: #d96632; }
+    .directive-hidden { display: none; }
+    .watch-folder-row { display: flex; align-items: center; gap: 8px; }
+    .watch-folder-status {
+      margin-top: 8px;
+      color: #8f8f8f;
+      font-size: 11px;
+      line-height: 1.4;
+      word-break: break-all;
+    }
+    .watch-folder-path {
+      color: #cfcfcf;
+      display: inline-block;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: bottom;
+    }
+    .intake-screen {
+      background: #161616;
+      border: 1px solid #2c2c2c;
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .intake-hidden { display: none; }
+    .intake-title { font-size: 24px; font-weight: 650; color: #f5f5f5; }
+    .intake-subtext { font-size: 13px; color: #a0a0a0; line-height: 1.5; }
+    .intake-file {
+      width: 100%;
+      background: #111;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      color: #cfcfcf;
+      font-size: 12px;
+      padding: 8px;
+    }
+    .intake-actions { display: flex; align-items: center; gap: 10px; }
+    .intake-upload-btn {
+      border: none;
+      border-radius: 8px;
+      background: #e8713a;
+      color: #fff;
+      font-weight: 700;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .intake-upload-btn:disabled { opacity: 0.5; cursor: default; }
+    .intake-progress { font-size: 12px; color: #9c9c9c; }
+    .intake-result { font-size: 12px; color: #9fe1a6; }
+    .setup-screen {
+      background: #161616;
+      border: 1px solid #2c2c2c;
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .setup-hidden { display: none; }
+    .setup-title { font-size: 24px; font-weight: 650; color: #f5f5f5; }
+    .setup-subtext { font-size: 13px; color: #a0a0a0; line-height: 1.5; }
+    .setup-label { font-size: 11px; color: #9e9e9e; text-transform: uppercase; letter-spacing: 0.04em; }
+    .setup-input {
+      width: 100%;
+      background: #111;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      color: #ececec;
+      font-size: 13px;
+      padding: 8px 10px;
+      outline: none;
+    }
+    .setup-input:focus { border-color: #4f4f4f; }
+    .setup-continue-btn {
+      border: none;
+      border-radius: 8px;
+      background: #e8713a;
+      color: #fff;
+      font-weight: 700;
+      padding: 9px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      width: fit-content;
+    }
+    .setup-continue-btn:disabled { opacity: 0.5; cursor: default; }
+    .setup-error { font-size: 12px; color: #fca5a5; }
+    @keyframes realtime-pulse {
+      0% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.25); opacity: 1; }
+      100% { transform: scale(0.9); opacity: 0.6; }
+    }
   </style>
 </head>
 <body>
@@ -212,19 +581,89 @@
 
   <div id="status-bar"></div>
 
-  <div id="main">
-    <div id="message-display"></div>
-
-    <div id="input-row">
-      <textarea id="task-input" rows="2" placeholder="What do you want to do?"></textarea>
-      <button id="send-btn">Go</button>
-    </div>
+    <div id="main">
+      <div id="setup-screen" class="setup-screen setup-hidden">
+        <div class="setup-title">Connect your database.</div>
+        <div class="setup-subtext">Enter your Supabase project URL and anon key to initialize Presence for your workspace.</div>
+        <label class="setup-label" for="setup-supabase-url">Supabase URL</label>
+        <input id="setup-supabase-url" class="setup-input" type="text" placeholder="https://your-project.supabase.co" />
+        <label class="setup-label" for="setup-supabase-anon-key">Supabase Anon Key</label>
+        <input id="setup-supabase-anon-key" class="setup-input" type="text" placeholder="eyJ..." />
+        <button id="setup-continue-btn" class="setup-continue-btn">Continue</button>
+        <div id="setup-error" class="setup-error"></div>
+      </div>
+      <div id="intake-screen" class="intake-screen intake-hidden">
+        <div class="intake-title">Start with your history.</div>
+        <div class="intake-subtext">
+          Export your ChatGPT or Claude conversation history, unzip it, and upload conversations.json.
+          Presence will extract your 77 founding memories.
+        </div>
+        <input id="intake-file-input" class="intake-file" type="file" accept=".json,application/json" />
+        <div class="intake-actions">
+          <button id="intake-upload-btn" class="intake-upload-btn">Upload</button>
+          <span id="intake-progress" class="intake-progress"></span>
+        </div>
+        <div id="intake-result" class="intake-result"></div>
+      </div>
+      <div id="presence-directive-panel" style="padding: 10px; border-top: 1px solid #333;">
+        <div id="realtime-toggle-row">
+          <button id="realtime-toggle-btn" title="Toggle real-time listener">🎙️ Realtime</button>
+          <span id="realtime-status-dot"></span>
+          <span id="realtime-status-text">off</span>
+        </div>
+        <div class="directive-card">
+          <div class="directive-title">File Watcher</div>
+          <div class="watch-folder-row">
+            <button id="watch-folder-btn" class="directive-btn">Watch Folder</button>
+          </div>
+          <div id="watch-folder-status" class="watch-folder-status">No folder selected.</div>
+        </div>
+        <div id="directive-active" class="directive-card directive-hidden">
+          <div class="directive-title">Prime Directive</div>
+          <div id="directive-text" class="directive-text"></div>
+          <div id="directive-meta" class="directive-meta"></div>
+          <div class="directive-actions">
+            <button id="directive-update-btn" class="directive-btn">Update</button>
+            <button id="directive-clear-btn" class="directive-btn clear">Clear</button>
+          </div>
+        </div>
+        <div id="directive-editor" class="directive-card">
+          <div class="directive-title">Prime Directive</div>
+          <div class="directive-input-row">
+            <input id="directive-input" class="directive-input" type="text" placeholder="Set prime directive..." />
+            <button id="directive-submit-btn" class="directive-submit">Set</button>
+          </div>
+        </div>
+      </div>
+      <div id="output-feed"></div>
+      <div id="message-display"></div>
+      <div id="queue-log"></div>
+      <div id="recovery-row">
+        <button id="recover-btn">Reload Tab</button>
+      </div>
 
     <div id="approval-panel">
       <textarea id="decline-note" rows="2" placeholder="Note for retry (optional)"></textarea>
       <div id="approval-buttons">
         <button id="approve-btn">Approve</button>
         <button id="decline-btn">Decline</button>
+      </div>
+    </div>
+
+    <div id="ask-panel">
+      <div id="ask-input-row">
+        <textarea id="ask-answer" rows="2" placeholder="Type your answer..."></textarea>
+      </div>
+      <div id="ask-buttons">
+        <button id="answer-btn">Reply</button>
+        <button id="cancel-ask-btn">Cancel</button>
+      </div>
+    </div>
+
+    <div id="teach-panel">
+      <div id="teach-buttons">
+        <button id="show-me-btn">🎯 Show Me</button>
+        <button id="cancel-teach-btn">Cancel</button>
       </div>
     </div>
 

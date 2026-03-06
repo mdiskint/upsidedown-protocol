@@ -1,15 +1,23 @@
 {
   "manifest_version": 3,
-  "name": "Upside Down",
+  "name": "Presence",
+  "short_name": "Presence",
   "version": "0.1.0",
-  "description": "Your AI travels with you across the web.",
+  "description": "Proactive intelligence layer — watches how you work and surfaces what matters.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
 
   "permissions": [
     "activeTab",
     "tabs",
     "scripting",
     "storage",
-    "sessions"
+    "sessions",
+    "sidePanel"
   ],
 
   "host_permissions": [
@@ -20,15 +28,45 @@
     "service_worker": "background.js"
   },
 
+  "side_panel": {
+    "default_path": "panel/panel.html"
+  },
+
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+H",
+        "mac": "Command+Shift+H"
+      },
+      "description": "Toggle Hearth panel"
+    }
+  },
+
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content/content.js", "panel/panel.js"],
+      "js": ["content/content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "js": ["platform-memory-scraper.js"],
       "run_at": "document_idle"
     }
   ],
 
-  "action": {},
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
 
   "web_accessible_resources": [
     {
